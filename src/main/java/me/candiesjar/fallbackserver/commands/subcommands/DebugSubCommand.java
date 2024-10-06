@@ -1,23 +1,25 @@
 package me.candiesjar.fallbackserver.commands.subcommands;
 
-import me.candiesjar.fallbackserver.FallbackServerBungee;
+import com.velocitypowered.api.command.CommandSource;
+import com.velocitypowered.api.proxy.Player;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
+import lombok.RequiredArgsConstructor;
+import me.candiesjar.fallbackserver.FallbackServerVelocity;
 import me.candiesjar.fallbackserver.commands.interfaces.SubCommand;
-import me.candiesjar.fallbackserver.enums.BungeeConfig;
-import me.candiesjar.fallbackserver.utils.Utils;
-import net.md_5.bungee.api.CommandSender;
-import net.md_5.bungee.api.config.ServerInfo;
+import me.candiesjar.fallbackserver.enums.VelocityConfig;
+import me.candiesjar.fallbackserver.handler.DebugLimboHandler;
+import me.candiesjar.fallbackserver.utils.WorldUtil;
+import me.candiesjar.fallbackserver.utils.player.ChatUtil;
+import net.kyori.adventure.text.Component;
 
+@RequiredArgsConstructor
 public class DebugSubCommand implements SubCommand {
 
-    private final FallbackServerBungee plugin;
-
-    public DebugSubCommand(FallbackServerBungee plugin) {
-        this.plugin = plugin;
-    }
+    private final FallbackServerVelocity plugin;
 
     @Override
     public String getPermission() {
-        return BungeeConfig.DEBUG_COMMAND_PERMISSION.getString();
+        return VelocityConfig.DEBUG_PERMISSION.get(String.class);
     }
 
     @Override
@@ -26,46 +28,41 @@ public class DebugSubCommand implements SubCommand {
     }
 
     @Override
-    public void perform(CommandSender sender, String[] arguments) {
-
-        if (arguments.length < 2) {
-            Utils.printDebug("§cNo arguments provided!", false);
+    public void perform(CommandSource commandSource, String[] args) {
+        if (args.length < 2) {
+            commandSource.sendMessage(Component.text(ChatUtil.color("&cIncorrent arguments!")));
             return;
         }
 
-        String command = arguments[1];
+        String command = args[1];
+
+        if (command.equalsIgnoreCase("spawn")) {
+            Player player = (Player) commandSource;
+            WorldUtil.getFallbackLimbo().spawnPlayer(player, new DebugLimboHandler());
+        }
 
         if (command.equalsIgnoreCase("ping")) {
-            if (arguments.length < 3) {
-                Utils.printDebug("§cNo server provided!", true);
+            if (args.length < 3) {
+                commandSource.sendMessage(Component.text(ChatUtil.color("&cNo server provided!")));
                 return;
             }
 
-            String serverName = arguments[2];
-            ServerInfo serverInfo = plugin.getProxy().getServerInfo(serverName);
+            String serverName = args[2];
 
-            if (serverInfo == null) {
-                Utils.printDebug("§cServer not found!", false);
-                return;
-            }
+            commandSource.sendMessage(Component.text(ChatUtil.color("&cPinging server " + serverName + "...")));
 
-            Utils.printDebug("§cPinging server " + serverName + "...", false);
+            RegisteredServer serverInfo = plugin.getServer().getServer(serverName).get();
 
-            serverInfo.ping((result, error) -> {
+            serverInfo.ping().whenComplete((result, error) -> {
                 if (error != null || result == null) {
-                    Utils.printDebug("§cError while pinging server!", false);
+                    commandSource.sendMessage(Component.text(ChatUtil.color("&cError while pinging server!")));
                     return;
                 }
 
-                Utils.printDebug("§cServer pinged successfully!", false);
-
-                int players = result.getPlayers().getOnline();
-
-                Utils.printDebug("§cPlayers: " + players, false);
-
-                int max = result.getPlayers().getMax();
-
-                Utils.printDebug("§cPlayers: " + players + "/" + max, false);
+                commandSource.sendMessage(Component.text(ChatUtil.color("&aServer pinged successfully!")));
+                commandSource.sendMessage(Component.text(ChatUtil.color("&aPlayers online: " + result.getPlayers().get())));
+                commandSource.sendMessage(Component.text(ChatUtil.color("&aVersion: " + result.getVersion().getName())));
+                commandSource.sendMessage(Component.text(ChatUtil.color("&aMax players: " + result.asBuilder().getMaximumPlayers())));
             });
         }
 

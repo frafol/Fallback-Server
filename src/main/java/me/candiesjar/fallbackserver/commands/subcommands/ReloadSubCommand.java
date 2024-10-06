@@ -1,25 +1,24 @@
 package me.candiesjar.fallbackserver.commands.subcommands;
 
+import com.velocitypowered.api.command.CommandMeta;
+import com.velocitypowered.api.command.CommandSource;
 import lombok.RequiredArgsConstructor;
-import me.candiesjar.fallbackserver.FallbackServerBungee;
+import me.candiesjar.fallbackserver.FallbackServerVelocity;
 import me.candiesjar.fallbackserver.commands.base.HubCommand;
 import me.candiesjar.fallbackserver.commands.interfaces.SubCommand;
-import me.candiesjar.fallbackserver.enums.BungeeConfig;
-import me.candiesjar.fallbackserver.enums.BungeeMessages;
-import me.candiesjar.fallbackserver.objects.text.TextFile;
-import me.candiesjar.fallbackserver.utils.ReconnectUtil;
+import me.candiesjar.fallbackserver.enums.VelocityConfig;
+import me.candiesjar.fallbackserver.enums.VelocityMessages;
+import me.candiesjar.fallbackserver.objects.text.Placeholder;
+import me.candiesjar.fallbackserver.utils.player.ChatUtil;
 import me.candiesjar.fallbackserver.utils.tasks.PingTask;
-import net.md_5.bungee.api.CommandSender;
-import net.md_5.bungee.api.config.ServerInfo;
 
 @RequiredArgsConstructor
 public class ReloadSubCommand implements SubCommand {
-
-    private final FallbackServerBungee plugin;
+    private final FallbackServerVelocity plugin;
 
     @Override
     public String getPermission() {
-        return BungeeConfig.RELOAD_PERMISSION.getString();
+        return VelocityConfig.RELOAD_PERMISSION.get(String.class);
     }
 
     @Override
@@ -28,33 +27,41 @@ public class ReloadSubCommand implements SubCommand {
     }
 
     @Override
-    public void perform(CommandSender sender, String[] arguments) {
-        boolean wasCommandEnabled = BungeeConfig.LOBBY_COMMAND.getBoolean();
+    public void perform(CommandSource commandSource, String[] args) {
 
-        PingTask.getTask().cancel();
-        TextFile.reloadAll();
+        boolean wasCommandEnabled = VelocityConfig.LOBBY_COMMAND.get(Boolean.class);
 
-        boolean isCommandEnabled = BungeeConfig.LOBBY_COMMAND.getBoolean();
+        PingTask.getScheduledTask().cancel();
+        plugin.reloadAll();
+
+        boolean isCommandEnabled = VelocityConfig.LOBBY_COMMAND.get(Boolean.class);
 
         if (wasCommandEnabled != isCommandEnabled) {
-            HubCommand hubCommand = new HubCommand(plugin);
+            String[] aliases = VelocityConfig.LOBBY_ALIASES.getStringList().toArray(new String[0]);
+
+            if (aliases.length == 0) {
+                aliases = new String[]{"hub"};
+            }
+
+            CommandMeta commandMeta = plugin.getServer().getCommandManager()
+                    .metaBuilder(VelocityConfig.LOBBY_ALIASES.getStringList().get(0))
+                    .aliases(aliases)
+                    .build();
 
             if (isCommandEnabled) {
-                plugin.getProxy().getPluginManager().registerCommand(plugin, hubCommand);
+                plugin.getServer().getCommandManager().register(commandMeta, new HubCommand(plugin));
             } else {
-                plugin.getProxy().getPluginManager().unregisterCommand(hubCommand);
+                plugin.getServer().getCommandManager().unregister(commandMeta);
             }
-        }
 
-        ServerInfo reconnectServer = ReconnectUtil.checkForPhysicalServer();
-        plugin.setReconnectServer(reconnectServer);
+        }
 
         plugin.getServerTypeManager().clear();
         plugin.getOnlineLobbiesManager().clear();
 
         plugin.loadServers();
-        plugin.reloadTask();
+        PingTask.reload();
 
-        BungeeMessages.RELOAD.send(sender);
+        VelocityMessages.RELOAD.send(commandSource, new Placeholder("prefix", ChatUtil.getFormattedString(VelocityMessages.PREFIX)));
     }
 }

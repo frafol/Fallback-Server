@@ -1,29 +1,29 @@
 package me.candiesjar.fallbackserver.utils;
 
 import lombok.experimental.UtilityClass;
-import me.candiesjar.fallbackserver.FallbackServerBungee;
+import me.candiesjar.fallbackserver.FallbackServerVelocity;
 import me.candiesjar.fallbackserver.cache.OnlineLobbiesManager;
 import me.candiesjar.fallbackserver.cache.ServerTypeManager;
 import me.candiesjar.fallbackserver.objects.ServerType;
-import net.md_5.bungee.config.Configuration;
+import org.simpleyaml.configuration.ConfigurationSection;
 
 import java.util.List;
 
 @UtilityClass
 public class LoaderUtil {
 
-    private final FallbackServerBungee fallbackServerBungee = FallbackServerBungee.getInstance();
+    private final FallbackServerVelocity fallbackServerBungee = FallbackServerVelocity.getInstance();
     private final ServerTypeManager serverTypeManager = fallbackServerBungee.getServerTypeManager();
     private final OnlineLobbiesManager onlineLobbiesManager = fallbackServerBungee.getOnlineLobbiesManager();
 
-    public void loadServers(Configuration section) {
+    public void loadServers(ConfigurationSection section) {
         if (section == null) {
             Utils.printDebug("§7[§c!§7] There is an error in your configuration", true);
             Utils.printDebug("§7[§c!§7] Please check the 'settings.fallback' section", true);
             return;
         }
 
-        for (String key : section.getKeys()) {
+        for (String key : section.getKeys(false)) {
             if (key.equalsIgnoreCase("placeholder")) {
                 continue;
             }
@@ -33,7 +33,7 @@ public class LoaderUtil {
 
                 if (servers.isEmpty()) {
                     Utils.printDebug("§7[§c!§7] There are no default lobbies", true);
-                    Utils.printDebug("§7[§c!§7] Please add some servers to the 'default' section", true);
+                    Utils.printDebug("§7[§c!§7] Please add your lobbies to the 'default' section", true);
                     break;
                 }
 
@@ -47,7 +47,7 @@ public class LoaderUtil {
 
             if (servers.isEmpty()) {
                 Utils.printDebug("§7[§c!§7] There are no servers", true);
-                Utils.printDebug("§7[§c!§7] Please add some servers to the '" + key + "' section", true);
+                Utils.printDebug("§7[§c!§7] Please add your servers to the '" + key + "' section", true);
                 break;
             }
 
@@ -57,6 +57,12 @@ public class LoaderUtil {
 
             switch (mode) {
                 case "RECONNECT":
+                    fallbackServerBungee.loadReconnect();
+
+                    if (!fallbackServerBungee.isReconnect()) {
+                        break;
+                    }
+
                     reconnect = true;
                     break;
                 case "DEFAULT":

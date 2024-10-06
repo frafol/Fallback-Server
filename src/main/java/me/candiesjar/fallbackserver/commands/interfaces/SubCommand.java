@@ -1,6 +1,6 @@
 package me.candiesjar.fallbackserver.commands.interfaces;
 
-import net.md_5.bungee.api.CommandSender;
+import com.velocitypowered.api.command.CommandSource;
 
 public interface SubCommand {
 
@@ -8,6 +8,6 @@ public interface SubCommand {
 
     boolean isEnabled();
 
-    void perform(CommandSender sender, String[] arguments);
+    void perform(CommandSource commandSource, String[] args);
 
 }

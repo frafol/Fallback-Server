@@ -9,10 +9,10 @@
 #             ░  ░    ░  ░    ░  ░ ░            ░  ░░ ░      ░  ░            ░     ░  ░   ░           ░     ░  ░   ░
 #                                       ░           ░                                                ░
 # Made by CandiesJar | Github: github.com/sasi2006166 | Discord: https://discord.gg/dJ8DG2cSzt | Telegram: @CandiesJar
-# BungeeCord configuration file
+# Velocity configuration file
 
-# IMPORTANT WARNING: Before reporting any issue on discord, carefully READ ALL the comments!
-# Some features are MISSING/DISABLED since they're under work, no support is provided on them.
+# IMPORTANT WARNING: Before reporting any issue on discord, READ carefully the comments!
+# Some features are DISABLED since they're under development, don't report any bugs on them.
 # Thanks for understanding.
 
 settings:
@@ -34,8 +34,14 @@ settings:
 
   # In seconds, will check your lobbies every X seconds, defined under here.
   # On first start / reboot, let the plugin settle down for X seconds (defined under here) before start using fallback.
-  # Recommended value is around 10, especially in case of not stable spigot instances.
-  ping_delay: 8
+  # Recommended to use 5 if your server is in beta or have not stable spigot instances.
+  ping_delay: 5
+
+  # In seconds, determines the timeout phase
+  # during the ping check.
+  # If the server doesn't respond in X seconds
+  # defined under here, it will be considered offline.
+  ping_timeout: 2
 
   # Choose if you want to enable the updater.
   updater: true
@@ -59,7 +65,7 @@ settings:
         - lobby1
         - lobby2
         - lobby3
-      mode: RECONNECT
+      mode: FALLBACK
     default: # DON'T delete this default group.
       servers:
         - lobby1
@@ -79,9 +85,9 @@ settings:
     - "afk"
     - "maintenance"
 
+  # If you want to use the reconnect mode, fallback_mode must be set to RECONNECT.
   # Those values will clear the chat on reconnect (after success) or when players
   # get fallback-ed to another server.
-  # reconnect_join will clear player chat when the reconnect phase starts.
   clear_chat:
     fallback: true
     server_switch: false
@@ -116,37 +122,47 @@ settings:
     # WARNING 2: Remember to change the value also inside spigot addon.
     player_count_check: -1
 
-    # With this option, you can teleport players to a physical server
-    # when they're reconnecting. Useful if you want to entertain your players.
-    # WARNING: You need to have the spigot addon installed and configured.
-    physical_reconnect:
-      enabled: false
-      server: "reconnectsv"
+    # Option to choose if making the player join a limbo server
+    # while reconnecting.
+    # True: Player will be moved to limbo while reconnecting.
+    # False: Player stay on kicked server while reconnecting.
+    join_limbo: false
 
-    # This option will trigger normal kicking procedure.
-    # If set on false, the plugin will disconnect the player instead of kicking.
+    # Customize your limbo server here.
+    # WARNING: Will work only if "join_limbo" is set on true.
+    limbo_settings:
+      name: "FallbackLimbo" # Name of the limbo server, can anything.
+      dimension: "OVERWORLD" # Dimension of the limbo server, can be "NETHER" or "THE_END".
+      gamemode: "ADVENTURE" # Gamemode of the limbo server, can be "SURVIVAL", "CREATIVE", "ADVENTURE", or "SPECTATOR".
+      schematic:
+        enabled: false
+        name: "limbo.schematic" # Only works if it's enabled.
+        x: 69
+        y: 70
+        z: 69
+      world_time: 5000
+      x: 0
+      y: 100
+      z: 0
+      yaw: 0
+      pitch: 0
+
+    # Time for time-outing the server on ping.
+    # In Milliseconds, 2000 for example = 2 seconds.
+    ping_timeout: 2000
+
+    # This option will trigger normal FallbackServer kicking procedure.
+    # Sorting players in various lobbies.
     player_sort: true
 
-    # Delay before actual connecting the player to the server, useful
-    # for preventing spigot instance overload.
+    # Time before starting the server pinging on reconnect.
+    # Don't put values under 1, they will NOT work.
     # In seconds.
-    connection_delay: 7
-
-    # This is the timeout for checking if the server
-    # is online or not using a pinging method.
-    # In milliseconds.
-    ping_threshold: 2000
-
-    # Determines the delay before starting
-    # the actual reconnection, useful for preventing
-    # backend replying to my plugin ping request on
-    # server stop (like /restart).
-    task_delay: 10
+    first_delay: 3
 
     # Choose if you want to clear the tab-list when
     # a player enters the "limbo" while reconnecting.
-    # Useful for preventing visual bugs with names, especially
-    # after reconnecting
+    # Useful for preventing visual bugs with names.
     clear_tab-list: true
 
     # Ignored reasons for reconnecting.
@@ -170,7 +186,7 @@ settings:
     # If players gets kicked from one of those servers
     # they will not be reconnected, instead they will be
     # moved to a fallback lobby.
-    # Add event servers, such as minigames, here.
+    # Add event servers, such as mini-games, here.
     ignored_servers:
       - lobby1
       - lobby2
@@ -178,7 +194,6 @@ settings:
 
     # Title can be customized into messages configuration.
     # Available in messages.yml
-    # DISABLED.
     title:
       enable: true
       # NORMAL: The normal animated title with dots
@@ -186,6 +201,10 @@ settings:
       # STATIC: Title will not animate dots
       # You can customize it in messages.yml
       mode: NORMAL
+
+  # True: Normal players will not be able to see the /fs output.
+  # False: Everyone will be able to see the simple "running fallbackserver" message.
+  hide_command: false
 
   # Checks if stats should be enabled -> https://bstats.org/plugin/bungeecord/FallbackServer/11817
   # By default this setting is set on "true" to help me improve the plugin.
@@ -196,18 +215,15 @@ settings:
   # DISABLED.
   admin_notification: true
 
-  # Enable the in-built command blocker functionality.
-  # Useful in case you want to block some commands on specific servers, for
-  # example, during a screen-share session.
+  # Choose if you want to use fallbackserver's built-in command blocker.
   command_blocker: true
 
-  # WARNING: will only work if "command_blocker" is set on true.
+  # WARNING: will only work if "use_command_blocker" is set on true.
   # Add here the servers with the command(s) you want to block.
   # TEMPLATE:
-  # command_blocker_list:
-  #   server_name:
-  #     - command1
-  #     - command2
+  # SERVERNAME:
+  #   - COMMAND1
+  #   - COMMAND2
   command_blocker_list:
     hack_control:
       - lobby
@@ -228,7 +244,7 @@ settings:
   # Enable server blacklist feature, such for authentication servers.
   ignored_servers: true
 
-  # WARNING: Works only if "use_ignored_servers" is set on true.
+  # WARNING: Works only if "server_blacklist" is set on true.
   # Add here your pre-lobbies or any server you want to disable.
   # Kicking will be disabled on those and player will be disconnected.
   ignored_servers_list:
@@ -247,6 +263,10 @@ sub_commands:
 
   debug:
     permission: "fallback.admin.debug"
+
+  create:
+    enabled: true
+    permission: "fallback.admin.create"
 
   add:
     enabled: true

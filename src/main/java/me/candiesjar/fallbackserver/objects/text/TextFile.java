@@ -1,62 +1,46 @@
 package me.candiesjar.fallbackserver.objects.text;
 
-import com.google.common.collect.Lists;
-import lombok.Getter;
 import lombok.SneakyThrows;
-import net.md_5.bungee.api.plugin.Plugin;
-import net.md_5.bungee.config.Configuration;
-import net.md_5.bungee.config.ConfigurationProvider;
-import net.md_5.bungee.config.YamlConfiguration;
+import org.simpleyaml.configuration.file.YamlFile;
 
-import java.io.File;
+import java.io.InputStream;
 import java.nio.file.Files;
-import java.util.List;
+import java.nio.file.Path;
+import java.util.Objects;
 
-@Getter
 public class TextFile {
-    private final Plugin plugin;
-    private final String path;
-
-    private Configuration config;
-    private final File file;
-
-    private static final List<TextFile> list = Lists.newArrayList();
-
-    public TextFile(Plugin plugin, String path) {
-        this.plugin = plugin;
-        this.path = path;
-
-        if (!plugin.getDataFolder().exists()) {
-            plugin.getDataFolder().mkdir();
-        }
-
-        file = new File(plugin.getDataFolder(), path);
-
-        config = create();
-
-        list.add(this);
-    }
+    private final YamlFile yamlFile;
 
     @SneakyThrows
-    private Configuration create() {
-        if (!file.exists()) {
-            Files.copy(plugin.getResourceAsStream(path), file.toPath());
+    public TextFile(Path path, String fileName) {
+        if (!Files.exists(path)) {
+            Files.createDirectory(path);
         }
 
-        return ConfigurationProvider.getProvider(YamlConfiguration.class).load(file);
+        Path configPath = path.resolve(fileName);
+
+        if (!Files.exists(configPath)) {
+            try (InputStream in = this.getClass().getClassLoader().getResourceAsStream(fileName)) {
+                Files.copy(Objects.requireNonNull(in), configPath);
+            }
+        }
+
+        yamlFile = new YamlFile(configPath.toFile());
+        yamlFile.load();
+
     }
 
-    @SneakyThrows
-    public void reload() {
-        config = ConfigurationProvider.getProvider(YamlConfiguration.class).load(file);
+    public YamlFile getConfig() {
+        return yamlFile;
     }
 
     @SneakyThrows
     public void save() {
-        ConfigurationProvider.getProvider(YamlConfiguration.class).save(config, file);
+        yamlFile.save();
     }
 
-    public static void reloadAll() {
-        list.forEach(TextFile::reload);
+    @SneakyThrows
+    public void reload() {
+        yamlFile.load();
     }
 }

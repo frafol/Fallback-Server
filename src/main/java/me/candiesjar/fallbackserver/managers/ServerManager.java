@@ -1,23 +1,24 @@
 package me.candiesjar.fallbackserver.managers;
 
+import com.velocitypowered.api.proxy.server.RegisteredServer;
 import eu.kennytv.maintenance.api.MaintenanceProvider;
 import eu.kennytv.maintenance.api.proxy.MaintenanceProxy;
 import eu.kennytv.maintenance.api.proxy.Server;
 import lombok.experimental.UtilityClass;
-import me.candiesjar.fallbackserver.FallbackServerBungee;
-import net.md_5.bungee.api.config.ServerInfo;
-import net.md_5.bungee.config.Configuration;
+import me.candiesjar.fallbackserver.FallbackServerVelocity;
+import me.candiesjar.fallbackserver.utils.Utils;
+import org.simpleyaml.configuration.ConfigurationSection;
 
 import java.util.List;
 
 @UtilityClass
 public class ServerManager {
 
-    private final FallbackServerBungee fallbackServerBungee = FallbackServerBungee.getInstance();
-    private final Configuration list = fallbackServerBungee.getConfig().getSection("settings.fallback");
+    private final FallbackServerVelocity fallbackServerVelocity = FallbackServerVelocity.getInstance();
+    private final ConfigurationSection list = fallbackServerVelocity.getConfigTextFile().getConfig().getConfigurationSection("settings.fallback");
 
     public String getGroupByServer(String name) {
-        for (String s : list.getKeys()) {
+        for (String s : list.getKeys(false)) {
             List<String> servers = list.getStringList(s + ".servers");
             if (!servers.contains(name)) {
                 continue;
@@ -29,7 +30,7 @@ public class ServerManager {
     }
 
     public String getGroupByName(String name) {
-        for (String s : list.getKeys()) {
+        for (String s : list.getKeys(false)) {
             if (!s.equalsIgnoreCase(name)) {
                 continue;
             }
@@ -39,14 +40,19 @@ public class ServerManager {
         return null;
     }
 
-    public boolean checkMaintenance(ServerInfo serverInfo) {
-        if (!fallbackServerBungee.isMaintenance()) {
+    public boolean checkMaintenance(RegisteredServer registeredServer) {
+        if (!fallbackServerVelocity.isMaintenance()) {
             return false;
         }
 
         MaintenanceProxy api = (MaintenanceProxy) MaintenanceProvider.get();
 
-        Server server = api.getServer(serverInfo.getName());
+        if (api == null) {
+            Utils.printDebug("Error in maintenance API, please check if is correctly enabled.", true);
+            return false;
+        }
+
+        Server server = api.getServer(registeredServer.getServerInfo().getName());
 
         return api.isMaintenance(server);
     }

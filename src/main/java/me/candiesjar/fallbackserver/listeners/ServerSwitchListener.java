@@ -1,77 +1,48 @@
 package me.candiesjar.fallbackserver.listeners;
 
-import lombok.SneakyThrows;
-import me.candiesjar.fallbackserver.FallbackServerBungee;
-import me.candiesjar.fallbackserver.cache.PlayerCacheManager;
-import me.candiesjar.fallbackserver.connection.FallbackBridge;
-import me.candiesjar.fallbackserver.enums.BungeeConfig;
-import me.candiesjar.fallbackserver.enums.BungeeMessages;
+import com.velocitypowered.api.event.Subscribe;
+import com.velocitypowered.api.event.player.ServerPostConnectEvent;
+import com.velocitypowered.api.event.player.ServerPreConnectEvent;
+import com.velocitypowered.api.proxy.Player;
+import lombok.RequiredArgsConstructor;
+import me.candiesjar.fallbackserver.FallbackServerVelocity;
+import me.candiesjar.fallbackserver.enums.VelocityConfig;
+import me.candiesjar.fallbackserver.handler.FallbackLimboHandler;
 import me.candiesjar.fallbackserver.utils.ReconnectUtil;
 import me.candiesjar.fallbackserver.utils.player.ChatUtil;
-import net.md_5.bungee.ServerConnection;
-import net.md_5.bungee.UserConnection;
-import net.md_5.bungee.api.ProxyServer;
-import net.md_5.bungee.api.config.ServerInfo;
-import net.md_5.bungee.api.connection.ProxiedPlayer;
-import net.md_5.bungee.api.event.ServerSwitchEvent;
-import net.md_5.bungee.api.plugin.Listener;
-import net.md_5.bungee.event.EventHandler;
-import net.md_5.bungee.netty.ChannelWrapper;
-import net.md_5.bungee.netty.HandlerBoss;
+import net.elytrium.limboapi.api.player.LimboPlayer;
 
-import java.lang.reflect.Field;
 import java.util.UUID;
 
-public class ServerSwitchListener implements Listener {
+@RequiredArgsConstructor
+public class ServerSwitchListener {
 
-    private final FallbackServerBungee plugin;
-    private final PlayerCacheManager playerCacheManager;
-    private final ProxyServer proxyServer;
+    private final FallbackServerVelocity plugin;
 
-    public ServerSwitchListener(FallbackServerBungee plugin) {
-        this.plugin = plugin;
-        this.playerCacheManager = plugin.getPlayerCacheManager();
-        this.proxyServer = ProxyServer.getInstance();
-    }
+    @Subscribe
+    public void onServerSwitch(ServerPreConnectEvent event) {
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
 
-    @SneakyThrows
-    @EventHandler
-    public void onServerSwitch(ServerSwitchEvent event) {
-        if (event.getFrom() == null) {
+        boolean isReconnecting = plugin.getPlayerCacheManager().containsKey(uuid);
+        if (!isReconnecting) {
             return;
         }
 
-        UserConnection user = (UserConnection) event.getPlayer();
-        UUID uuid = user.getUniqueId();
-        ServerConnection server = user.getServer();
-        ChannelWrapper channelWrapper = server.getCh();
+        event.setResult(ServerPreConnectEvent.ServerResult.denied());
+        FallbackLimboHandler limboHandler = plugin.getPlayerCacheManager().get(uuid);
+        LimboPlayer limboPlayer = limboHandler.getLimboPlayer();
+        ReconnectUtil.cancelReconnect(uuid);
+        limboPlayer.disconnect(event.getOriginalServer());
+    }
 
-        Field handlerField = HandlerBoss.class.getDeclaredField("handler");
-        handlerField.setAccessible(true);
-
-        if (playerCacheManager.containsKey(uuid)) {
-            ServerInfo reconnectServer = plugin.getReconnectServer();
-            ServerInfo playerServer = user.getServer().getInfo();
-
-            if (reconnectServer != playerServer) {
-                removeFromReconnect(user);
-            }
-        }
-
-        boolean clearChat = BungeeConfig.CLEAR_CHAT_SERVER_SWITCH.getBoolean();
+    @Subscribe
+    public void onServerSwitched(ServerPostConnectEvent event) {
+        Player player = event.getPlayer();
+        boolean clearChat = VelocityConfig.CLEAR_CHAT_SERVER_SWITCH.get(Boolean.class);
 
         if (clearChat) {
-            ChatUtil.clearChat(user);
+            ChatUtil.clearChat(player);
         }
-
-        FallbackBridge fallbackBridge = new FallbackBridge(proxyServer, user, server);
-        channelWrapper.getHandle().pipeline().get(HandlerBoss.class).setHandler(fallbackBridge);
-
     }
-
-    private void removeFromReconnect(ProxiedPlayer player) {
-        BungeeMessages.EXITING_RECONNECT.send(player);
-        ReconnectUtil.cancelReconnect(player.getUniqueId());
-    }
-
 }

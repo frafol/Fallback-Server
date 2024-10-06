@@ -1,47 +1,57 @@
 package me.candiesjar.fallbackserver.listeners;
 
-import me.candiesjar.fallbackserver.FallbackServerBungee;
+import com.google.common.collect.Lists;
+import com.velocitypowered.api.event.Subscribe;
+import com.velocitypowered.api.event.player.ServerPreConnectEvent;
+import com.velocitypowered.api.proxy.Player;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
+import me.candiesjar.fallbackserver.FallbackServerVelocity;
 import me.candiesjar.fallbackserver.cache.OnlineLobbiesManager;
+import me.candiesjar.fallbackserver.cache.PlayerCacheManager;
 import me.candiesjar.fallbackserver.cache.ServerTypeManager;
-import me.candiesjar.fallbackserver.enums.BungeeConfig;
-import me.candiesjar.fallbackserver.enums.BungeeMessages;
+import me.candiesjar.fallbackserver.enums.VelocityConfig;
+import me.candiesjar.fallbackserver.enums.VelocityMessages;
 import me.candiesjar.fallbackserver.managers.ServerManager;
+import me.candiesjar.fallbackserver.objects.text.Placeholder;
 import me.candiesjar.fallbackserver.utils.player.ChatUtil;
-import net.md_5.bungee.api.chat.TextComponent;
-import net.md_5.bungee.api.config.ServerInfo;
-import net.md_5.bungee.api.connection.ProxiedPlayer;
-import net.md_5.bungee.api.event.ServerConnectEvent;
-import net.md_5.bungee.api.plugin.Listener;
-import net.md_5.bungee.event.EventHandler;
-import net.md_5.bungee.event.EventPriority;
+import net.kyori.adventure.text.Component;
 
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-public class JoinListener implements Listener {
+public class JoinListener {
 
-    private final FallbackServerBungee plugin;
-    private final OnlineLobbiesManager onlineLobbiesManager;
+    private final FallbackServerVelocity plugin;
+    private final PlayerCacheManager playerCacheManager;
     private final ServerTypeManager serverTypeManager;
+    private final OnlineLobbiesManager onlineLobbiesManager;
 
-    public JoinListener(FallbackServerBungee plugin) {
+    public JoinListener(FallbackServerVelocity plugin) {
         this.plugin = plugin;
+        this.playerCacheManager = plugin.getPlayerCacheManager();
         this.onlineLobbiesManager = plugin.getOnlineLobbiesManager();
         this.serverTypeManager = plugin.getServerTypeManager();
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onPlayerJoin(ServerConnectEvent event) {
-        if (!event.getReason().equals(ServerConnectEvent.Reason.JOIN_PROXY)) {
+    @Subscribe
+    public void onPlayerJoin(ServerPreConnectEvent event) {
+        Player player = event.getPlayer();
+
+        if (playerCacheManager.containsKey(player.getUniqueId())) {
             return;
         }
 
-        ProxiedPlayer player = event.getPlayer();
-        String groupName = BungeeConfig.JOIN_BALANCING_GROUP.getString();
-        String group = serverTypeManager.get(groupName) == null ? "default" : BungeeConfig.JOIN_BALANCING_GROUP.getString();
+        RegisteredServer previous = event.getPreviousServer();
 
-        List<ServerInfo> lobbies = onlineLobbiesManager.get(group);
+        if (!(previous == null)) {
+            return;
+        }
+
+        String groupName = VelocityConfig.JOIN_BALANCING_GROUP.get(String.class);
+        String group = serverTypeManager.get(groupName) == null ? "default" : VelocityConfig.JOIN_BALANCING_GROUP.get(String.class);
+
+        List<RegisteredServer> lobbies = Lists.newArrayList(onlineLobbiesManager.get(group));
         lobbies.removeIf(Objects::isNull);
 
         boolean useMaintenance = plugin.isMaintenance();
@@ -51,14 +61,13 @@ public class JoinListener implements Listener {
         }
 
         if (lobbies.isEmpty()) {
-            player.disconnect(new TextComponent(ChatUtil.getFormattedString(BungeeMessages.NO_SERVER)
-                    .replace("%prefix%", ChatUtil.getFormattedString(BungeeMessages.PREFIX))));
+            player.disconnect(Component.text(ChatUtil.getFormattedString(VelocityMessages.NO_SERVER, new Placeholder("prefix", ChatUtil.getFormattedString(VelocityMessages.PREFIX)))));
             return;
         }
 
-        lobbies.sort(Comparator.comparingInt(server -> server.getPlayers().size()));
-        ServerInfo serverInfo = lobbies.get(0);
+        lobbies.sort(Comparator.comparingInt(server -> server.getPlayersConnected().size()));
+        RegisteredServer serverInfo = lobbies.get(0);
 
-        event.setTarget(serverInfo);
+        event.setResult(ServerPreConnectEvent.ServerResult.allowed(serverInfo));
     }
 }

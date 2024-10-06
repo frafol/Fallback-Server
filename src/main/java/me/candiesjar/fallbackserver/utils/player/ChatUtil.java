@@ -1,13 +1,14 @@
 package me.candiesjar.fallbackserver.utils.player;
 
+import com.google.common.collect.Lists;
+import com.velocitypowered.api.command.CommandSource;
+import com.velocitypowered.api.proxy.Player;
 import lombok.experimental.UtilityClass;
-import me.candiesjar.fallbackserver.FallbackServerBungee;
-import me.candiesjar.fallbackserver.enums.BungeeMessages;
+import me.candiesjar.fallbackserver.FallbackServerVelocity;
+import me.candiesjar.fallbackserver.enums.VelocityMessages;
 import me.candiesjar.fallbackserver.objects.text.Placeholder;
-import net.md_5.bungee.api.ChatColor;
-import net.md_5.bungee.api.CommandSender;
-import net.md_5.bungee.api.chat.TextComponent;
-import net.md_5.bungee.api.connection.ProxiedPlayer;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,33 +18,28 @@ import java.util.stream.Collectors;
 
 @UtilityClass
 public class ChatUtil {
-    private final FallbackServerBungee fallbackServerBungee = FallbackServerBungee.getInstance();
-    private final TextComponent usableComponent = new TextComponent();
+    private final FallbackServerVelocity instance = FallbackServerVelocity.getInstance();
 
-    public String getString(BungeeMessages bungeeMessages) {
-        return fallbackServerBungee.getMessagesConfig().getString(bungeeMessages.getPath());
+    public String getString(VelocityMessages velocityMessages) {
+        return instance.getMessagesTextFile().getConfig().getString(velocityMessages.getPath());
     }
 
-    public String getString(BungeeMessages bungeeMessages, Placeholder... placeholders) {
-        return applyPlaceHolder(getString(bungeeMessages), placeholders);
+    public String getString(VelocityMessages velocityMessages, Placeholder... placeholders) {
+        return applyPlaceHolder(getString(velocityMessages), placeholders);
     }
 
-    public String getFormattedString(BungeeMessages bungeeMessages) {
-        return color(getString(bungeeMessages));
+    public String getFormattedString(VelocityMessages velocityMessages, Placeholder... placeholders) {
+        return color(getString(velocityMessages, placeholders));
     }
 
-    public String getFormattedString(BungeeMessages bungeeMessages, Placeholder... placeholders) {
-        return color(getString(bungeeMessages, placeholders));
+    public List<String> getStringList(VelocityMessages velocityMessages) {
+        return instance.getMessagesTextFile().getConfig().getStringList(velocityMessages.getPath());
     }
 
-    public List<String> getStringList(BungeeMessages bungeeMessages) {
-        return fallbackServerBungee.getMessagesConfig().getStringList(bungeeMessages.getPath());
-    }
-
-    public List<String> getStringList(BungeeMessages bungeeMessages, Placeholder... placeholders) {
+    public List<String> getStringList(VelocityMessages velocityMessages, Placeholder... placeholders) {
         List<String> newList = new ArrayList<>();
 
-        for (String s : getStringList(bungeeMessages)) {
+        for (String s : getStringList(velocityMessages)) {
             s = applyPlaceHolder(s, placeholders);
             newList.add(s);
         }
@@ -55,56 +51,76 @@ public class ChatUtil {
         for (Placeholder placeHolder : placeholders) {
             s = s.replace(placeHolder.getKey(), placeHolder.getValue());
         }
+
         return s;
     }
 
     public String color(String s) {
-        return colorHex(s);
+        String hex = convertHexColors(s);
+        return hex.replace("&", "§");
     }
 
     public List<String> color(List<String> list) {
         return list.stream().map(ChatUtil::color).collect(Collectors.toList());
     }
 
-    public TextComponent asComponent(String s) {
-        usableComponent.setText(s);
-        return usableComponent;
-    }
-
-    public void sendList(CommandSender commandSender, List<String> stringList) {
+    public void sendList(CommandSource commandSource, List<String> stringList) {
         for (String message : stringList) {
-            commandSender.sendMessage(asComponent(message));
+            commandSource.sendMessage(Component.text(message));
         }
     }
 
-    public void sendFormattedList(BungeeMessages bungeeMessages, CommandSender commandSender, Placeholder... placeholders) {
-        sendList(commandSender, color(getStringList(bungeeMessages, placeholders)));
+    public void sendFormattedList(VelocityMessages velocityMessages, CommandSource commandSource, Placeholder... placeholders) {
+        sendList(commandSource, color(getStringList(velocityMessages, placeholders)));
     }
 
-    public void clearChat(ProxiedPlayer player) {
-        for (int i = 0; i < 100; i++) {
-            player.sendMessage(new TextComponent(""));
+    public String componentToString(Component component) {
+        return PlainTextComponentSerializer.plainText().serialize(component);
+    }
+
+    public String convertHexColors(String message) {
+        if (!containsHexColor(message)) {
+            return message;
         }
-    }
 
-    public String colorHex(String s) {
         Pattern pattern = Pattern.compile("#[a-fA-F0-9]{6}");
-        for (Matcher matcher = pattern.matcher(s); matcher.find(); matcher = pattern.matcher(s)) {
-            String color = s.substring(matcher.start(), matcher.end());
-            s = s.replace(color, ChatColor.of(color) + "");
+        Matcher matcher = pattern.matcher(message);
+        while (matcher.find()) {
+            String hexCode = message.substring(matcher.start(), matcher.end());
+            String replaceSharp = hexCode.replace('#', 'x');
+
+            char[] ch = replaceSharp.toCharArray();
+            StringBuilder builder = new StringBuilder();
+            for (char c : ch) {
+                builder.append("&").append(c);
+            }
+
+            message = message.replace(hexCode, builder.toString());
+            matcher = pattern.matcher(message);
         }
-        s = ChatColor.translateAlternateColorCodes('&', s);
-        return s;
+        return message;
     }
 
-    public boolean checkMessage(String message, String name) {
-        for (String text : fallbackServerBungee.getConfig().getStringList("settings.command_blocker_list." + name)) {
-            text = "/" + text;
-            if (text.equalsIgnoreCase(message)) {
-                return true;
-            }
+    public boolean containsHexColor(String message) {
+        String hexColorPattern = "(?i)&#[a-f0-9]{6}";
+        return message.matches(".*" + hexColorPattern + ".*");
+    }
+
+    public boolean checkMessage(String message, List<String> stringList) {
+        List<String> list = Lists.newArrayList();
+
+        for (String s : stringList) {
+            String toLowerCase = s.toLowerCase();
+            list.add(toLowerCase);
         }
-        return false;
+
+        return list.contains(message.toLowerCase());
+    }
+
+    public void clearChat(Player player) {
+        for (int i = 0; i < 100; i++) {
+            player.sendMessage(Component.text(""));
+        }
     }
 
 }

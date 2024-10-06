@@ -1,64 +1,59 @@
 package me.candiesjar.fallbackserver.utils;
 
 import lombok.Getter;
+import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
-import me.candiesjar.fallbackserver.FallbackServerBungee;
-import net.md_5.bungee.UserConnection;
-import net.md_5.bungee.api.ProxyServer;
-import net.md_5.bungee.netty.ChannelWrapper;
+import me.candiesjar.fallbackserver.FallbackServerVelocity;
+import org.simpleyaml.configuration.ConfigurationSection;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.lang.reflect.Field;
-import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @UtilityClass
 public class Utils {
 
+    private final FallbackServerVelocity fallbackServerVelocity = FallbackServerVelocity.getInstance();
     @Getter
-    private String remoteVersion = "Loading";
-    @Getter
-    private boolean updateAvailable = false;
+    private static String remoteVersion = "Loading";
 
-    private final FallbackServerBungee fallbackServerBungee = FallbackServerBungee.getInstance();
-    private final ProxyServer proxyServer = ProxyServer.getInstance();
-    private Field userChannelWrapperField = null;
+    @SneakyThrows(Exception.class)
+    public CompletableFuture<Boolean> getUpdates() {
 
-    static {
-        for (Field field : UserConnection.class.getDeclaredFields()) {
-            if (ChannelWrapper.class.isAssignableFrom(field.getType())) {
-                userChannelWrapperField = field;
-                userChannelWrapperField.setAccessible(true);
-                break;
-            }
+        if (fallbackServerVelocity.isBeta()) {
+            return CompletableFuture.supplyAsync(() -> false);
         }
+
+        return CompletableFuture.supplyAsync(() -> {
+            boolean isUpdateAvailable;
+            URLConnection connection;
+            try {
+                connection = new URL("https://api.spigotmc.org/legacy/update.php?resource=86398").openConnection();
+                try (InputStreamReader inputStreamReader = new InputStreamReader(connection.getInputStream())) {
+                    try (BufferedReader bufferedReader = new BufferedReader(inputStreamReader)) {
+                        remoteVersion = bufferedReader.readLine();
+                        isUpdateAvailable = !fallbackServerVelocity.getVersion().equalsIgnoreCase(remoteVersion);
+                    }
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            return isUpdateAvailable;
+        });
     }
 
-    public void checkUpdates() {
-        proxyServer.getScheduler().runAsync(fallbackServerBungee, () -> {
-            try {
-                URL url = new URL("https://api.spigotmc.org/legacy/update.php?resource=86398");
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
+    public void printDebug(String s, boolean exception) {
+        if (exception) {
+            fallbackServerVelocity.getComponentLogger().error("[ERROR] {}", s);
+            return;
+        }
 
-                int responseCode = connection.getResponseCode();
-                if (responseCode != HttpURLConnection.HTTP_OK) {
-                    printDebug("Cannot fetch updates. HTTP response code: " + responseCode, true);
-                    return;
-                }
-
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
-                    remoteVersion = reader.readLine();
-                }
-
-                updateAvailable = !fallbackServerBungee.getDescription().getVersion().equals(remoteVersion);
-            } catch (IOException e) {
-                printDebug("Cannot fetch updates", true);
-            }
-        });
+        fallbackServerVelocity.getComponentLogger().warn("[DEBUG] {}", s);
     }
 
     public String getDots(int s) {
@@ -75,29 +70,17 @@ public class Utils {
         }
     }
 
+    public boolean checkIfGroupExists(String group) {
+        ConfigurationSection section = fallbackServerVelocity.getConfigTextFile().getConfig().getConfigurationSection("settings.fallback");
+        ConfigurationSection servers = fallbackServerVelocity.getServersTextFile().getConfig().getConfigurationSection("servers");
+
+        return section.getKeys(false).contains(group) || servers.getKeys(false).contains(group);
+    }
+
     public void saveServers(List<String> servers) {
-        fallbackServerBungee.getServersTextFile().getConfig().set("servers", servers);
-        fallbackServerBungee.getServersTextFile().save();
-        fallbackServerBungee.getServersTextFile().reload();
-    }
-
-    public ChannelWrapper getUserChannelWrapper(UserConnection user) {
-        if (user != null) {
-            try {
-                return (ChannelWrapper) userChannelWrapperField.get(user);
-            } catch (ClassCastException | IllegalArgumentException | IllegalAccessException e) {
-                printDebug("Cannot get user channel wrapper for " + user.getName(), true);
-            }
-        }
-        return null;
-    }
-
-    public void printDebug(String s, boolean exception) {
-        if (!exception) {
-            fallbackServerBungee.getLogger().warning("[DEBUG] " + s);
-        } else {
-            fallbackServerBungee.getLogger().severe("[ERROR] " + s);
-        }
+        fallbackServerVelocity.getServersTextFile().getConfig().set("servers", servers);
+        fallbackServerVelocity.getServersTextFile().save();
+        fallbackServerVelocity.getServersTextFile().reload();
     }
 
 }

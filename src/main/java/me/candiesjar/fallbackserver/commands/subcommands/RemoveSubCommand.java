@@ -1,55 +1,56 @@
 package me.candiesjar.fallbackserver.commands.subcommands;
 
+import com.velocitypowered.api.command.CommandSource;
 import lombok.RequiredArgsConstructor;
-import me.candiesjar.fallbackserver.FallbackServerBungee;
+import me.candiesjar.fallbackserver.FallbackServerVelocity;
 import me.candiesjar.fallbackserver.commands.interfaces.SubCommand;
-import me.candiesjar.fallbackserver.enums.BungeeConfig;
-import me.candiesjar.fallbackserver.enums.BungeeMessages;
-import me.candiesjar.fallbackserver.enums.BungeeServers;
+import me.candiesjar.fallbackserver.enums.VelocityConfig;
+import me.candiesjar.fallbackserver.enums.VelocityMessages;
+import me.candiesjar.fallbackserver.enums.VelocityServers;
 import me.candiesjar.fallbackserver.objects.text.Placeholder;
 import me.candiesjar.fallbackserver.utils.Utils;
-import net.md_5.bungee.api.CommandSender;
+import me.candiesjar.fallbackserver.utils.player.ChatUtil;
 
 import java.util.List;
 
 @RequiredArgsConstructor
 public class RemoveSubCommand implements SubCommand {
 
-    private final FallbackServerBungee plugin;
+    private final FallbackServerVelocity plugin;
 
     @Override
     public String getPermission() {
-        return BungeeConfig.REMOVE_COMMAND_PERMISSION.getString();
+        return VelocityConfig.REMOVE_COMMAND_PERMISSION.get(String.class);
     }
 
     @Override
     public boolean isEnabled() {
-        return BungeeConfig.REMOVE_COMMAND.getBoolean();
+        return VelocityConfig.REMOVE_COMMAND.get(Boolean.class);
     }
 
     @Override
-    public void perform(CommandSender sender, String[] arguments) {
+    public void perform(CommandSource sender, String[] args) {
 
-        if (arguments.length < 2) {
-            BungeeMessages.EMPTY_SERVER.send(sender);
+        if (args.length < 2) {
+            VelocityMessages.EMPTY_GROUP.send(sender, new Placeholder("prefix", ChatUtil.getFormattedString(VelocityMessages.PREFIX)));
             return;
         }
 
-        String server = arguments[1];
+        String server = args[1];
 
-        if (!BungeeServers.SERVERS.getStringList().contains(server)) {
-            BungeeMessages.SERVER_NOT_CONTAINED.send(sender, new Placeholder("server", server));
+        if (!VelocityServers.SERVERS.getStringList().contains(server)) {
+            VelocityMessages.SERVER_NOT_CONTAINED.send(sender, new Placeholder("prefix", ChatUtil.getFormattedString(VelocityMessages.PREFIX)), new Placeholder("server", server));
             return;
         }
 
         remove(server);
-        BungeeMessages.SERVER_REMOVED.send(sender, new Placeholder("server", server));
+        VelocityMessages.SERVER_REMOVED.send(sender, new Placeholder("prefix", ChatUtil.getFormattedString(VelocityMessages.PREFIX)), new Placeholder("server", server));
 
     }
 
     private void remove(String serverName) {
 
-        List<String> servers = BungeeServers.SERVERS.getStringList();
+        List<String> servers = VelocityServers.SERVERS.getStringList();
 
         servers.remove(serverName);
 
@@ -58,10 +59,9 @@ public class RemoveSubCommand implements SubCommand {
         }
 
         Utils.saveServers(servers);
-        plugin.reloadTask();
+        plugin.reloadAll();
 
         servers.clear();
 
     }
-
 }

@@ -2,8 +2,8 @@ package me.candiesjar.fallbackserver.cache;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
 import lombok.Getter;
-import net.md_5.bungee.api.config.ServerInfo;
 
 import java.util.HashMap;
 import java.util.List;
@@ -22,29 +22,30 @@ public class OnlineLobbiesManager {
 
     private OnlineLobbiesManager() {
 
+
     }
 
-    private final HashMap<String, List<ServerInfo>> onlineLobbies = Maps.newHashMap();
+    private final HashMap<String, List<RegisteredServer>> onlineLobbies = Maps.newHashMap();
 
-    public List<ServerInfo> get(String key) {
+    public List<RegisteredServer> get(String key) {
         return onlineLobbies.get(key);
     }
 
-    public void put(String key, ServerInfo serverInfo) {
-        List<ServerInfo> serverInfos = onlineLobbies.get(key);
-        serverInfos.add(serverInfo);
+    public void put(String key, RegisteredServer registeredServer) {
+        List<RegisteredServer> serverInfos = onlineLobbies.get(key);
+        serverInfos.add(registeredServer);
         onlineLobbies.put(key, serverInfos);
     }
 
-    public void remove(String key, ServerInfo serverInfo) {
-        List<ServerInfo> serverInfos = onlineLobbies.get(key);
-        serverInfos.remove(serverInfo);
+    public void remove(String key, RegisteredServer registeredServer) {
+        List<RegisteredServer> serverInfos = onlineLobbies.get(key);
+        serverInfos.remove(registeredServer);
         onlineLobbies.put(key, serverInfos);
     }
 
-    public boolean containsValue(String key, ServerInfo serverInfo) {
-        List<ServerInfo> serverInfos = onlineLobbies.get(key);
-        return serverInfos.contains(serverInfo);
+    public boolean containsValue(String key, RegisteredServer registeredServer) {
+        List<RegisteredServer> serverInfos = onlineLobbies.get(key);
+        return serverInfos.contains(registeredServer);
     }
 
     public void firstLoad(String key) {

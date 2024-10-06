@@ -1,43 +1,45 @@
 package me.candiesjar.fallbackserver.utils.player;
 
+import com.velocitypowered.api.proxy.Player;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
 import lombok.experimental.UtilityClass;
-import me.candiesjar.fallbackserver.enums.BungeeMessages;
+import me.candiesjar.fallbackserver.enums.VelocityMessages;
 import me.candiesjar.fallbackserver.utils.Utils;
-import net.md_5.bungee.api.ProxyServer;
-import net.md_5.bungee.api.Title;
-import net.md_5.bungee.api.chat.TextComponent;
-import net.md_5.bungee.api.config.ServerInfo;
-import net.md_5.bungee.api.connection.ProxiedPlayer;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.title.Title;
+
+import java.time.Duration;
 
 @UtilityClass
 public class TitleUtil {
 
-    private final Title createdTitle = ProxyServer.getInstance().createTitle();
+    public void sendTitle(int fadeIn, int stay, int fadeOut, String title, String subTitle, RegisteredServer registeredServer, Player player) {
+        Title.Times times = Title.Times.times(Duration.ofSeconds(fadeIn),
+                Duration.ofSeconds(stay),
+                Duration.ofSeconds(fadeOut));
 
-    public void sendTitle(int fadeIn, int stay, int fadeOut, BungeeMessages title, BungeeMessages subTitle, ServerInfo serverInfo, ProxiedPlayer proxiedPlayer) {
-        createdTitle.fadeIn(fadeIn * 20);
-        createdTitle.stay(stay * 20);
-        createdTitle.fadeOut(fadeOut * 20);
+        Title createdTitle = Title.title(
+                Component.text(ChatUtil.color(title)
+                        .replace("%server%", registeredServer.getServerInfo().getName())
+                        .replace("%dots%", Utils.getDots(0))),
+                Component.text(ChatUtil.color(subTitle)
+                        .replace("%server%", registeredServer.getServerInfo().getName())
+                        .replace("%dots%", Utils.getDots(0))),
+                times);
 
-        createdTitle.title(new TextComponent(ChatUtil.getFormattedString(title)
-                .replace("%server%", serverInfo.getName())
-                .replace("%dots%", Utils.getDots(0))));
-        createdTitle.subTitle(new TextComponent(ChatUtil.getFormattedString(subTitle)
-                .replace("%server%", serverInfo.getName())
-                .replace("%dots%", Utils.getDots(0))));
-
-        createdTitle.send(proxiedPlayer);
+        player.showTitle(createdTitle);
     }
 
-    public void sendReconnectingTitle(int fadeIn, int stay, int dots, BungeeMessages title, BungeeMessages subTitle, ProxiedPlayer proxiedPlayer) {
-        createdTitle.fadeIn(fadeIn);
-        createdTitle.stay(stay);
+    public void sendReconnectingTitle(int fadeIn, int stay, int dots, VelocityMessages title, VelocityMessages subTitle, Player player) {
+        Title.Times times = Title.Times.times(Duration.ofSeconds(fadeIn),
+                Duration.ofSeconds(stay),
+                Duration.ofSeconds(1));
 
-        createdTitle.title(new TextComponent(ChatUtil.getFormattedString(title)
-                .replace("%dots%", Utils.getDots(dots))));
-        createdTitle.subTitle(new TextComponent(ChatUtil.getFormattedString(subTitle)
-                .replace("%dots%", Utils.getDots(dots))));
+        Title createdTitle = Title.title(Component.text(ChatUtil.getFormattedString(title)
+                        .replace("%dots%", Utils.getDots(dots))),
+                Component.text(ChatUtil.getFormattedString(subTitle)), times);
 
-        createdTitle.send(proxiedPlayer);
+        player.showTitle(createdTitle);
     }
+
 }

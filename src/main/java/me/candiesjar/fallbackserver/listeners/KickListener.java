@@ -2,28 +2,22 @@ package me.candiesjar.fallbackserver.listeners;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import me.candiesjar.fallbackserver.FallbackServerBungee;
+import com.velocitypowered.api.event.Subscribe;
+import com.velocitypowered.api.event.player.KickedFromServerEvent;
+import com.velocitypowered.api.proxy.Player;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
+import me.candiesjar.fallbackserver.FallbackServerVelocity;
 import me.candiesjar.fallbackserver.cache.OnlineLobbiesManager;
 import me.candiesjar.fallbackserver.cache.ServerTypeManager;
-import me.candiesjar.fallbackserver.enums.BungeeConfig;
-import me.candiesjar.fallbackserver.enums.BungeeMessages;
-import me.candiesjar.fallbackserver.handlers.ReconnectHandler;
+import me.candiesjar.fallbackserver.enums.VelocityConfig;
+import me.candiesjar.fallbackserver.enums.VelocityMessages;
 import me.candiesjar.fallbackserver.managers.ServerManager;
 import me.candiesjar.fallbackserver.objects.ServerType;
 import me.candiesjar.fallbackserver.objects.text.Placeholder;
 import me.candiesjar.fallbackserver.utils.ConditionUtil;
 import me.candiesjar.fallbackserver.utils.player.ChatUtil;
 import me.candiesjar.fallbackserver.utils.player.TitleUtil;
-import net.md_5.bungee.ServerConnection;
-import net.md_5.bungee.UserConnection;
-import net.md_5.bungee.api.chat.BaseComponent;
-import net.md_5.bungee.api.chat.TextComponent;
-import net.md_5.bungee.api.config.ServerInfo;
-import net.md_5.bungee.api.connection.ProxiedPlayer;
-import net.md_5.bungee.api.event.ServerKickEvent;
-import net.md_5.bungee.api.plugin.Listener;
-import net.md_5.bungee.event.EventHandler;
-import net.md_5.bungee.event.EventPriority;
+import net.kyori.adventure.text.Component;
 
 import java.util.Comparator;
 import java.util.List;
@@ -32,73 +26,70 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.LongAdder;
 
-public class KickListener implements Listener {
+public class KickListener {
 
-    private final FallbackServerBungee plugin;
+    private final FallbackServerVelocity plugin;
     private final ServerTypeManager serverTypeManager;
     private final OnlineLobbiesManager onlineLobbiesManager;
     private final Map<String, LongAdder> pendingConnections;
 
-    public KickListener(FallbackServerBungee plugin) {
+    public KickListener(FallbackServerVelocity plugin) {
         this.plugin = plugin;
         this.serverTypeManager = plugin.getServerTypeManager();
         this.onlineLobbiesManager = plugin.getOnlineLobbiesManager();
         this.pendingConnections = Maps.newConcurrentMap();
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onServerKick(ServerKickEvent event) {
-        ProxiedPlayer player = event.getPlayer();
-
-        if (!player.isConnected()) {
+    @Subscribe(priority = Short.MAX_VALUE)
+    public void onPlayerKick(KickedFromServerEvent event) {
+        if (event.kickedDuringServerConnect()) {
             return;
         }
 
-        ServerKickEvent.State state = event.getState();
-
-        if (state != ServerKickEvent.State.CONNECTED) {
-            return;
-        }
-
-        ServerInfo kickedFrom = event.getKickedFrom();
-        String kickedName = kickedFrom == null ? "ReconnectLimbo" : kickedFrom.getName();
+        Player player = event.getPlayer();
+        RegisteredServer kickedFrom = event.getServer();
+        String kickedName = kickedFrom.getServerInfo() == null ? "" : kickedFrom.getServerInfo().getName();
+        boolean isEmpty = event.getServerKickReason().isEmpty();
+        String kickReasonString = isEmpty ? "Lost Connection" : ChatUtil.componentToString(event.getServerKickReason().get());
         String group = ServerManager.getGroupByServer(kickedName) == null ? "default" : ServerManager.getGroupByServer(kickedName);
-        boolean isEmpty = event.getReason() == null;
-        String reason = isEmpty ? "LOST_CONNECTION" : BaseComponent.toLegacyText(event.getReason()).trim();
         ServerType serverType = serverTypeManager.get(group);
 
-        if (serverType == null || kickedName.equalsIgnoreCase("ReconnectLimbo")) {
-            handleFallback(event, kickedFrom, player, reason, kickedName);
+        if (kickedName.equalsIgnoreCase("FallbackLimbo")) {
+            handleFallback(event, kickedFrom, player, kickReasonString, kickedName, true);
+            return;
+        }
+
+        if (serverType == null) {
+            handleFallback(event, kickedFrom, player, kickReasonString, kickedName, false);
             return;
         }
 
         boolean isReconnect = serverType.isReconnect();
 
-        if (isReconnect) {
-            handleReconnect(event, reason, kickedName, player);
+        if (isReconnect && plugin.isReconnect()) {
             return;
         }
 
-        handleFallback(event, kickedFrom, player, reason, kickedName);
+        handleFallback(event, kickedFrom, player, kickReasonString, kickedName, false);
     }
 
-    private void handleFallback(ServerKickEvent event, ServerInfo kickedFrom, ProxiedPlayer player, String reason, String serverName) {
-        List<String> ignoredReasons = BungeeConfig.IGNORED_REASONS.getStringList();
+    private void handleFallback(KickedFromServerEvent event, RegisteredServer kickedFrom, Player player, String kickReasonString, String kickedName, boolean reconnect) {
+        List<String> ignoredReasons = VelocityConfig.IGNORED_REASONS.getStringList();
 
-        if (shouldIgnore(reason, BungeeConfig.IGNORED_REASONS.getStringList())) {
+        if (shouldIgnore(kickReasonString, ignoredReasons)) {
+            event.setResult(KickedFromServerEvent.DisconnectPlayer.create(Component.text(ChatUtil.color(kickReasonString))));
             return;
         }
 
-        boolean ignoredServer = BungeeConfig.USE_IGNORED_SERVERS.getBoolean() && BungeeConfig.IGNORED_SERVER_LIST.getStringList().contains(serverName);
+        boolean ignoredServer = VelocityConfig.USE_IGNORED_SERVERS.get(Boolean.class) && VelocityConfig.IGNORED_SERVERS_LIST.getStringList().contains(kickedName);
 
         if (ignoredServer) {
+            event.setResult(KickedFromServerEvent.DisconnectPlayer.create(Component.text(ChatUtil.color(kickReasonString))));
             return;
         }
 
-        event.setCancelled(true);
-
-        String group = ServerManager.getGroupByServer(serverName) == null ? "default" : ServerManager.getGroupByServer(serverName);
-        List<ServerInfo> lobbies = Lists.newArrayList(onlineLobbiesManager.get(group));
+        String group = ServerManager.getGroupByServer(kickedName) == null ? "default" : ServerManager.getGroupByServer(kickedName);
+        List<RegisteredServer> lobbies = Lists.newArrayList(onlineLobbiesManager.get(group));
         lobbies.removeIf(Objects::isNull);
         lobbies.remove(kickedFrom);
 
@@ -109,86 +100,52 @@ public class KickListener implements Listener {
         }
 
         if (lobbies.isEmpty()) {
-            if (reason.isEmpty()) {
-                player.disconnect(new TextComponent(ChatUtil.getFormattedString(BungeeMessages.NO_SERVER)));
+            if (kickReasonString.isEmpty()) {
+                String disconnectMessage = VelocityMessages.NO_SERVER.get(String.class).replace("%prefix%", ChatUtil.getFormattedString(VelocityMessages.PREFIX));
+                event.setResult(KickedFromServerEvent.DisconnectPlayer.create(Component.text(ChatUtil.color(disconnectMessage))));
                 return;
             }
-            player.disconnect(new TextComponent(reason));
+            event.setResult(KickedFromServerEvent.DisconnectPlayer.create(Component.text(ChatUtil.color(kickReasonString))));
             return;
         }
 
-        lobbies.sort(Comparator.comparingInt(server -> server.getPlayers().size() + getPendingConnections(server.getName())));
-        ServerInfo serverInfo = lobbies.get(0);
+        lobbies.sort(Comparator.comparingInt(server -> server.getPlayersConnected().size() + getPendingConnections(server.getServerInfo().getName())));
+        RegisteredServer registeredServer = lobbies.get(0);
 
-        event.setCancelServer(serverInfo);
-        incrementPendingConnections(serverInfo.getName());
+        event.setResult(KickedFromServerEvent.RedirectPlayer.create(registeredServer));
 
-        plugin.getProxy().getScheduler().schedule(plugin, () -> decrementPendingConnections(serverInfo.getName()), 1, TimeUnit.SECONDS);
+        incrementPendingConnections(registeredServer.getServerInfo().getName());
 
-        boolean clearChat = BungeeConfig.CLEAR_CHAT_FALLBACK.getBoolean();
+        plugin.getServer().getScheduler().buildTask(plugin, () -> decrementPendingConnections(registeredServer.getServerInfo().getName()))
+                .delay(1, TimeUnit.SECONDS)
+                .schedule();
 
-        if (clearChat) {
-            ChatUtil.clearChat(player);
+        if (!reconnect) {
+            boolean clearChat = VelocityConfig.CLEAR_CHAT_FALLBACK.get(Boolean.class);
+
+            if (clearChat) {
+                ChatUtil.clearChat(player);
+            }
         }
 
-        boolean useTitle = BungeeMessages.USE_FALLBACK_TITLE.getBoolean();
+        boolean useTitle = VelocityMessages.USE_FALLBACK_TITLE.get(Boolean.class);
 
         if (useTitle) {
-            plugin.getProxy().getScheduler().schedule(plugin, () -> TitleUtil.sendTitle(BungeeMessages.FALLBACK_FADE_IN.getInt(),
-                            BungeeMessages.FALLBACK_STAY.getInt(),
-                            BungeeMessages.FALLBACK_FADE_OUT.getInt(),
-                            BungeeMessages.FALLBACK_TITLE,
-                            BungeeMessages.FALLBACK_SUB_TITLE,
-                            serverInfo,
-                            player),
-                    BungeeMessages.FALLBACK_DELAY.getInt(), 0, TimeUnit.SECONDS);
+            plugin.getServer().getScheduler().buildTask(plugin, () -> TitleUtil.sendTitle(
+                            VelocityMessages.FALLBACK_FADE_IN.get(Integer.class),
+                            VelocityMessages.FALLBACK_STAY.get(Integer.class),
+                            VelocityMessages.FALLBACK_FADE_OUT.get(Integer.class),
+                            VelocityMessages.FALLBACK_TITLE.get(String.class),
+                            VelocityMessages.FALLBACK_SUB_TITLE.get(String.class),
+                            registeredServer,
+                            player)).delay(VelocityMessages.FALLBACK_DELAY.get(Integer.class) + 1, TimeUnit.SECONDS)
+                    .schedule();
         }
 
-        BungeeMessages.KICKED_TO_LOBBY.sendList(player,
-                new Placeholder("server", serverInfo.getName()),
-                new Placeholder("reason", ChatUtil.color(reason)));
-    }
-
-    private void handleReconnect(ServerKickEvent event, String reason, String serverName, ProxiedPlayer player) {
-        List<String> ignoredReasons = BungeeConfig.RECONNECT_IGNORED_REASONS.getStringList();
-
-        if (shouldIgnore(reason, BungeeConfig.RECONNECT_IGNORED_REASONS.getStringList())) {
-            return;
-        }
-
-        boolean ignoredServer = BungeeConfig.RECONNECT_IGNORED_SERVERS.getStringList().contains(serverName);
-
-        if (ignoredServer) {
-            return;
-        }
-
-        UserConnection userConnection = (UserConnection) player;
-        ServerConnection serverConnection = userConnection.getServer();
-        ReconnectHandler task = plugin.getPlayerCacheManager().get(player.getUniqueId());
-
-        if (task == null) {
-            plugin.getPlayerCacheManager().put(player.getUniqueId(), task = new ReconnectHandler(userConnection, serverConnection, userConnection.getUniqueId()));
-        }
-
-        boolean clearTab = BungeeConfig.RECONNECT_CLEAR_TABLIST.getBoolean();
-
-        if (clearTab) {
-            userConnection.resetTabHeader();
-        }
-
-        boolean clearChat = BungeeConfig.CLEAR_CHAT_RECONNECT_JOIN.getBoolean();
-
-        if (clearChat) {
-            ChatUtil.clearChat(player);
-        }
-
-        task.start();
-
-        boolean usePhysicalServer = plugin.getReconnectServer() != null;
-
-        if (usePhysicalServer) {
-            event.setCancelled(true);
-            event.setCancelServer(plugin.getReconnectServer());
+        if (!reconnect) {
+            VelocityMessages.KICKED_TO_LOBBY.sendList(player,
+                    new Placeholder("server", registeredServer.getServerInfo().getName()),
+                    new Placeholder("reason", ChatUtil.color(kickReasonString)));
         }
     }
 
@@ -214,4 +171,5 @@ public class KickListener implements Listener {
     private boolean shouldIgnore(String reason, List<String> ignoredReasons) {
         return ConditionUtil.checkReason(ignoredReasons, reason);
     }
+
 }

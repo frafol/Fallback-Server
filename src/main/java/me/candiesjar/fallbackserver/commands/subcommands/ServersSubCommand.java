@@ -1,14 +1,14 @@
 package me.candiesjar.fallbackserver.commands.subcommands;
 
-import me.candiesjar.fallbackserver.FallbackServerBungee;
+import com.velocitypowered.api.command.CommandSource;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
+import me.candiesjar.fallbackserver.FallbackServerVelocity;
 import me.candiesjar.fallbackserver.cache.OnlineLobbiesManager;
 import me.candiesjar.fallbackserver.commands.interfaces.SubCommand;
-import me.candiesjar.fallbackserver.enums.BungeeConfig;
-import me.candiesjar.fallbackserver.enums.BungeeMessages;
+import me.candiesjar.fallbackserver.enums.VelocityConfig;
+import me.candiesjar.fallbackserver.enums.VelocityMessages;
 import me.candiesjar.fallbackserver.managers.ServerManager;
 import me.candiesjar.fallbackserver.objects.text.Placeholder;
-import net.md_5.bungee.api.CommandSender;
-import net.md_5.bungee.api.config.ServerInfo;
 
 import java.util.HashMap;
 import java.util.List;
@@ -18,46 +18,45 @@ public class ServersSubCommand implements SubCommand {
 
     private final OnlineLobbiesManager onlineLobbiesManager;
 
-    public ServersSubCommand(FallbackServerBungee plugin) {
+    public ServersSubCommand(FallbackServerVelocity plugin) {
         this.onlineLobbiesManager = plugin.getOnlineLobbiesManager();
     }
 
     @Override
     public String getPermission() {
-        return BungeeConfig.SERVERS_COMMAND_PERMISSION.getString();
+        return VelocityConfig.SERVERS_COMMAND_PERMISSION.get(String.class);
     }
 
     @Override
     public boolean isEnabled() {
-        return BungeeConfig.SERVERS_COMMAND.getBoolean();
+        return VelocityConfig.SERVERS_COMMAND.get(Boolean.class);
     }
 
     @Override
-    public void perform(CommandSender sender, String[] arguments) {
-        HashMap<String, List<ServerInfo>> onlineLobbies = onlineLobbiesManager.getOnlineLobbies();
+    public void perform(CommandSource sender, String[] args) {
+        HashMap<String, List<RegisteredServer>> onlineLobbies = onlineLobbiesManager.getOnlineLobbies();
 
         if (onlineLobbies.isEmpty()) {
             return;
         }
 
-        BungeeMessages.SERVERS_COMMAND_HEADER.sendList(sender);
+        VelocityMessages.SERVERS_COMMAND_HEADER.sendList(sender);
 
         onlineLobbies.forEach((group, servers) -> {
             servers.removeIf(Objects::isNull);
 
             if (!servers.isEmpty()) {
-                BungeeMessages.SERVERS_COMMAND_GROUP.send(sender, new Placeholder("group", group));
+                VelocityMessages.SERVERS_COMMAND_GROUP.send(sender, new Placeholder("group", group));
 
                 servers.forEach(server -> {
-                    String status = ServerManager.checkMaintenance(server) ? BungeeMessages.SERVERS_COMMAND_MAINTENANCE.getString() : BungeeMessages.SERVERS_COMMAND_ONLINE.getString();
-                    BungeeMessages.SERVERS_COMMAND_LIST.send(sender,
-                            new Placeholder("server", server.getName()),
+                    String status = ServerManager.checkMaintenance(server) ? VelocityMessages.SERVERS_COMMAND_MAINTENANCE.get(String.class) : VelocityMessages.SERVERS_COMMAND_ONLINE.get(String.class);
+                    VelocityMessages.SERVERS_COMMAND_LIST.send(sender,
+                            new Placeholder("server", server.getServerInfo().getName()),
                             new Placeholder("status", status));
                 });
             }
         });
 
-        BungeeMessages.SERVERS_COMMAND_FOOTER.sendList(sender);
+        VelocityMessages.SERVERS_COMMAND_FOOTER.sendList(sender);
     }
-
 }

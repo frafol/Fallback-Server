@@ -1,63 +1,55 @@
 package me.candiesjar.fallbackserver.commands.subcommands;
 
+import com.velocitypowered.api.command.CommandSource;
 import lombok.RequiredArgsConstructor;
-import me.candiesjar.fallbackserver.FallbackServerBungee;
+import me.candiesjar.fallbackserver.FallbackServerVelocity;
 import me.candiesjar.fallbackserver.commands.interfaces.SubCommand;
-import me.candiesjar.fallbackserver.enums.BungeeConfig;
-import me.candiesjar.fallbackserver.enums.BungeeMessages;
-import me.candiesjar.fallbackserver.enums.BungeeServers;
-import me.candiesjar.fallbackserver.objects.text.Placeholder;
+import me.candiesjar.fallbackserver.enums.VelocityConfig;
+import me.candiesjar.fallbackserver.enums.VelocityMessages;
+import me.candiesjar.fallbackserver.enums.VelocityServers;
 import me.candiesjar.fallbackserver.utils.Utils;
-import net.md_5.bungee.api.CommandSender;
-import net.md_5.bungee.api.ProxyServer;
 
 import java.util.List;
 
 @RequiredArgsConstructor
 public class AddSubCommand implements SubCommand {
 
-    private final FallbackServerBungee plugin;
+    private final FallbackServerVelocity plugin;
 
     @Override
     public String getPermission() {
-        return BungeeConfig.ADD_COMMAND_PERMISSION.getString();
+        return VelocityConfig.ADD_COMMAND_PERMISSION.get(String.class);
     }
 
     @Override
     public boolean isEnabled() {
-        return BungeeConfig.ADD_COMMAND.getBoolean();
+        return VelocityConfig.ADD_COMMAND.get(Boolean.class);
     }
 
     @Override
-    public void perform(CommandSender sender, String[] arguments) {
-        if (arguments.length < 2) {
-            BungeeMessages.EMPTY_SERVER.send(sender);
+    public void perform(CommandSource commandSource, String[] args) {
+        // /fs add <group> <server>
+        if (args.length != 3) {
+            VelocityMessages.EMPTY_GROUP.send(commandSource);
             return;
         }
 
-        String server = arguments[1];
+        String group = args[1];
+        String serverName = args[2];
 
-        if (BungeeServers.SERVERS.getStringList().contains(server) || BungeeConfig.FALLBACK_SECTION.getStringList().contains(server)) {
-            BungeeMessages.SERVER_CONTAINED.send(sender, new Placeholder("server", server));
-            return;
-        }
+        // check group exists
 
-        if (!ProxyServer.getInstance().getConfig().getServers().containsKey(server)) {
-            BungeeMessages.UNAVAILABLE_SERVER.send(sender, new Placeholder("server", server));
-            return;
-        }
 
-        save(server);
-        BungeeMessages.SERVER_ADDED.send(sender, new Placeholder("server", server));
+
     }
 
     private void save(String serverName) {
-        List<String> servers = BungeeServers.SERVERS.getStringList();
+        List<String> servers = VelocityServers.SERVERS.getStringList();
 
         servers.add(serverName);
 
         Utils.saveServers(servers);
-        plugin.reloadTask();
+        plugin.reloadAll();
 
         servers.clear();
     }

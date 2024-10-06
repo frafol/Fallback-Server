@@ -9,11 +9,11 @@
 #             ░  ░    ░  ░    ░  ░ ░            ░  ░░ ░      ░  ░            ░     ░  ░   ░           ░     ░  ░   ░
 #                                       ░           ░                                                ░
 # Made by CandiesJar | Github: github.com/sasi2006166 | Discord: https://discord.gg/dJ8DG2cSzt | Telegram: @CandiesJar
-# BungeeCord configuration file
+# Velocity configuration file
 
 MESSAGES:
   prefix: "&7&lF&b&lS &8&l» "
-  syntax: "%prefix% &cCorrect syntax: /fs <reload:add:remove:status:servers>"
+  syntax: "%prefix% &cCorrect syntax: /fs <reload:create:add:remove:status:server>"
   no_permission: "%prefix% &7I'm sorry, you're lacking permission &c%permission%"
   reloaded: "%prefix% &7Configuration reloaded &bsuccessfully&7!"
   only_player: "%prefix% &cOnly players can execute this command!"
@@ -21,14 +21,15 @@ MESSAGES:
   moved: "&7You've been connected to &b%server%"
   disabled_command: "%prefix% &cSorry, this command is disabled."
   no_server: "%prefix% &cThere is no lobby available."
-  empty_server: "%prefix% &7Please, &cspecify &7a server."
+  reconnection_failed: "%prefix% &7Re-connection &c&lfailed&7!"
+  exiting_reconnect: "%prefix% &7Exiting re-connection mode."
+
+  empty_group: "%prefix% &7Please, &cspecify &7a group."
   server_is_added: "%prefix% &b%server% &7is already inside this list."
   server_removed: "%prefix% &b%server% &7has been removed from group &b%group%&7."
   server_not_added: "%prefix% &b%server% &7is not inside this &c%group%&7."
   server_not_available: "%prefix% &b%server% &7doesn't exist inside BungeeCord."
   server_added: "%prefix% &b%server% &7is now added to group &b%group%&7."
-  connection_failed: "%prefix% &7Re-connection &c&lfailed&7! Moving to fallback."
-  exiting_reconnect: "%prefix% &7Exiting re-connection mode."
 
   moved_to_lobby:
     - ""
@@ -85,6 +86,19 @@ MESSAGES:
       - ""
       - "&8&m------------------"
 
+  create_command:
+    parameters: "%prefix% &7Correct syntax: /fs create <group> <mode>" # Mode can be "fallback" or "reconnect"
+    group_exists: "%prefix% &7Group &b%group% &7already exists."
+    group_created:
+      - ""
+      - "&7&m---------------------------------"
+      - "&7Group &b%group% &7has been created."
+      - "&7Mode: &b%mode%"
+      - "&7Add your servers using &b/fs add %group% <server>"
+      - "&7And then run /fs reload"
+      - "&7&m---------------------------------"
+    mode: "%prefix% &7Mode &c%mode% &7doesn't exist."
+
 TITLES: # Everything under this configuration is in seconds.
   fallback:
     enabled: true
@@ -113,6 +127,7 @@ TITLES: # Everything under this configuration is in seconds.
 
   lobby:
     enabled: true
+    delay: 2
     fade_in: 1
     fade_out: 1
     stay: 3
